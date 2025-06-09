@@ -1,5 +1,5 @@
 import { Handler } from '@netlify/functions';
-import { registerRoutes } from '../../server/routes.js';
+import { registerRoutes } from '../../server/routes';
 import express from 'express';
 
 const app = express();
@@ -43,7 +43,11 @@ export const handler: Handler = async (event, context) => {
         body: res.body
       });
     } catch (error) {
-      reject(error);
+      reject({
+        statusCode: 500,
+        headers: {},
+        body: JSON.stringify({ error: 'Internal server error' })
+      });
     }
   });
 };
