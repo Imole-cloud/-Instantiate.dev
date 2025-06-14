@@ -1,30 +1,61 @@
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Landing } from '@/pages/landing';
+import Dashboard from '@/pages/dashboard';
+import { Pricing } from '@/pages/pricing';
+import { ChatWorkspace } from '@/pages/chat-workspace';
+import { Auth } from '@/pages/auth';
+import { AzureMonitor } from '@/pages/azure-monitor';
+import { DeploymentTest } from '@/pages/deployment-test';
+import { TestSimple } from '@/pages/test-simple';
+import { NotFound } from '@/pages/not-found';
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Landing from "./pages/Landing";
-import Dashboard from "./pages/Dashboard";
-import NotFound from "./pages/NotFound";
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+      retry: 1,
+    },
+  },
+});
 
-const queryClient = new QueryClient();
+function App() {
+  const currentPath = window.location.pathname;
+  
+  const renderPage = () => {
+    switch (currentPath) {
+      case '/dashboard':
+        return <Dashboard />;
+      case '/pricing':
+        return <Pricing />;
+      case '/chat':
+        return <ChatWorkspace />;
+      case '/auth':
+        return <Auth />;
+      case '/azure-monitor':
+        return <AzureMonitor />;
+      case '/deployment-test':
+        return <DeploymentTest />;
+      case '/test-simple':
+        return <TestSimple />;
+      default:
+        if (currentPath !== '/') {
+          return <NotFound />;
+        }
+        return <Landing />;
+    }
+  };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        {renderPage()}
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;
