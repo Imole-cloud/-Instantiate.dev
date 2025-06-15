@@ -1848,110 +1848,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Netlify deployment routes
-  app.post("/api/real-deploy/netlify", async (req, res) => {
+  // AWS deployment endpoint
+  app.post("/api/real-deploy/aws", async (req, res) => {
     try {
-      const { netlifyDeploymentService } = await import('./netlify-deployment-service');
-      const { name, htmlContent, environmentVariables } = req.body;
+      const { awsService } = await import('./cloud-providers/aws-service');
+      const { name, code, codeType, region, service, environmentVariables } = req.body;
       
-      if (!name) {
+      if (!name || !code) {
         return res.status(400).json({
           success: false,
-          error: "Missing required parameter: name"
+          error: "Missing required parameters: name, code"
         });
       }
 
-      const result = await netlifyDeploymentService.deployCode({
+      const deploymentSpec = {
         name,
-        code: htmlContent || `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>${name}</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; }
-        .success { background: #d4edda; padding: 20px; border-radius: 4px; margin: 20px 0; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Deployment Successful</h1>
-        <div class="success">
-            Application "${name}" deployed successfully via Instanti8 Platform
-        </div>
-        <p>Deployment timestamp: ${new Date().toISOString()}</p>
-    </div>
-</body>
-</html>`,
-        codeType: 'html' as const
-      });
+        code: code || `<html><body><h1>Hello from ${name}</h1><p>Deployed via Instantiate</p></body></html>`,
+        codeType: codeType || 'html',
+        region: region || 'us-east-1',
+        service: service || 'web-app-with-alb',
+        environmentVariables: environmentVariables || {}
+      };
+
+      let result;
+      if (deploymentSpec.service === 'web-app-with-alb') {
+        result = await awsService.deployWebAppWithLoadBalancer(deploymentSpec);
+      } else if (deploymentSpec.service === 'lambda') {
+        result = await awsService.deployLambda(deploymentSpec);
+      } else if (deploymentSpec.service === 's3') {
+        result = await awsService.deployS3Website(deploymentSpec);
+      } else {
+        throw new Error(`Unsupported AWS service: ${deploymentSpec.service}`);
+      }
 
       res.json({
-        success: result.success,
-        siteId: result.siteId,
-        deployId: result.deployId,
+        success: result.id ? true : false,
+        deploymentId: result.id,
+        name: result.name,
+        type: result.type,
+        region: result.region,
+        status: result.status,
         url: result.url,
-        adminUrl: result.adminUrl,
-        buildStatus: result.buildStatus,
+        loadBalancerArn: result.loadBalancerArn,
+        instanceIds: result.instanceIds,
         error: result.error,
-        message: result.success ? "Netlify deployment completed successfully" : "Netlify deployment failed"
+        message: result.id ? "AWS deployment completed successfully" : "AWS deployment failed"
       });
 
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: "Netlify deployment failed",
-        message: error.message
-      });
-    }
-  });
-
-  app.get("/api/netlify/sites", async (req, res) => {
-    try {
-      const { netlifyDeploymentService } = await import('./netlify-deployment-service');
-      const sites = await netlifyDeploymentService.listSites();
-      
-      res.json({
-        success: true,
-        sites: sites.map(site => ({
-          id: site.id,
-          name: site.name,
-          url: site.url,
-          adminUrl: site.admin_url,
-          createdAt: site.created_at,
-          updatedAt: site.updated_at
-        }))
-      });
-
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: "Failed to list Netlify sites",
-        message: error.message
-      });
-    }
-  });
-
-  app.get("/api/netlify/deploy/:deployId/status", async (req, res) => {
-    try {
-      const { netlifyDeploymentService } = await import('./netlify-deployment-service');
-      const { deployId } = req.params;
-      
-      const status = await netlifyDeploymentService.getDeploymentStatus(deployId, 'deploy');
-      
-      res.json({
-        success: true,
-        deployId,
-        status: status || 'unknown',
-        url: '',
-        errorMessage: ''
-      });
-
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: "Failed to get deployment status",
+        error: "AWS deployment failed",
         message: error.message
       });
     }
@@ -2310,7 +2257,7 @@ const files = ${JSON.stringify(result.files, null, 2)};`,
 
     // Use AI for general deployment assistance
     const originalProvider = codeGenerator.determineProvider(message);
-    const validProvider = originalProvider === 'aws' || originalProvider === 'gcp' ? 'azure' : originalProvider as 'azure' | 'netlify' | 'replit';
+    const validProvider = originalProvider as 'azure' | 'aws' | 'netlify' | 'replit';
     
     const deploymentContext = {
       userQuery: message,
